@@ -48,14 +48,44 @@ ClothCRM is the internal back-office customer relationship management (CRM) and 
 
 Docker Compose automatically spins up the FastAPI application and a PostgreSQL database.
 
+Compose spins up three services: the FastAPI app (`web`), PostgreSQL 15 (`db`) and pgAdmin 4 (`pgadmin`).
+Migrations (`alembic upgrade head`) run automatically every time `web` starts.
+
 1. **Start Services:**
    ```bash
-   docker-compose up --build
+   docker compose up -d --build
    ```
-2. **Stop Services:**
+2. **Seed demo data (optional, first run):**
    ```bash
-   docker-compose down
+   docker compose exec web python scripts/seed.py
    ```
+3. **Stop Services:**
+   ```bash
+   docker compose down
+   ```
+
+#### Local ports
+
+Host ports are bound to `127.0.0.1` only, and are offset from the defaults so they
+do not clash with other projects running on the same machine:
+
+| Service  | URL / DSN                                            |
+|----------|------------------------------------------------------|
+| App      | http://localhost:8002                                |
+| pgAdmin  | http://localhost:5053                                |
+| Postgres | `postgresql://postgres:postgres@localhost:5435/clothcrm` |
+
+#### pgAdmin
+
+pgAdmin runs in desktop mode (no login prompt). The `clothcrm` server is
+pre-registered from `docker/pgadmin/servers.json` and authenticates through a
+`pgpass` file, so it connects with no password prompt. The `pgadmin_init` helper
+container copies that file into the pgAdmin volume with the ownership and `0600`
+permissions libpq requires.
+
+> The server list is imported only when the `pgadmin_data` volume is first created.
+> After editing `servers.json`, recreate it:
+> `docker compose rm -sf pgadmin && docker volume rm clothing-crm_pgadmin_data && docker compose up -d pgadmin`
 
 ---
 

@@ -1,39 +1,75 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
     container_name: clothcrm_db
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: clothcrm
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-clothcrm}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-clothcrm}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   web:
     build: .
     container_name: clothcrm_web
-    restart: always
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8002:8000"
     environment:
       - ENV=development
       - SECRET_KEY=supersecretkeyreplaceinproduction1234567890
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/clothcrm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-clothcrm}
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - .:/app
 
+  pgadmin_init:
+    image: busybox:1.36
+    container_name: clothcrm_pgadmin_init
+    user: "0:0"
+    command: >
+      sh -c "cp /seed/pgpass /var/lib/pgadmin/pgpass &&
+             chown 5050:5050 /var/lib/pgadmin/pgpass &&
+             chmod 600 /var/lib/pgadmin/pgpass &&
+             echo 'pgpass installed for pgadmin'"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/pgpass:/seed/pgpass:ro
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: clothcrm_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@clothcrm.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_LISTEN_PORT: 80
+    ports:
+      - "127.0.0.1:5053:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      pgadmin_init:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
+  pgadmin_data:

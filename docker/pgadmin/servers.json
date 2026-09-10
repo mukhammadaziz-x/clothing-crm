@@ -1,0 +1,18 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "ClothCRM Local",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "clothcrm",
+      "Username": "postgres",
+      "ConnectionParameters": {
+        "sslmode": "prefer",
+        "connect_timeout": 10
+      },
+      "PassFile": "/var/lib/pgadmin/pgpass",
+      "Comment": "ClothCRM PostgreSQL 15 (docker-compose service: db)"
+    }
+  }
+}
